@@ -62,5 +62,4 @@ allocations and is safe to call repeatedly with the same loaded model.
 - **Row-major NCHW** tensors; rank ∈ {1, 2, 4}.
 - **`.cinf` v1 format**: little-endian, version-tagged, self-describing.
 
-See `SPECIFICATION.md` and the per-capability specs under
-`openspec/changes/build-c-infer-project/specs/` for the full contract.
+See `SPECIFICATION.md` for the full design contract.
