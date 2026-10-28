@@ -12,7 +12,6 @@ See `SPECIFICATION.md` for the original design spec.
 ## Layout
 
 ```
-projects/c-infer/
   include/cinfer.h         Public C API
   src/                     Engine, arena, tensor, loader
     layers/                Linear, Conv2D, MaxPool2D, Flatten
@@ -22,6 +21,26 @@ projects/c-infer/
   demos/                   End-to-end MLP demo
   Makefile                 lib / test / demo / all / clean
 ```
+
+## Parity with PyTorch
+
+Each layer and a full MLP are exported from PyTorch with fixed weights and
+a fixed input. The C engine output is compared against PyTorch's output.
+`make test` runs all of them.
+
+| Test | Covers | Tolerance vs PyTorch (abs.) |
+|------|--------|-------------------------------|
+| `test_linear` | fully connected | 1e-5 |
+| `test_conv2d` | 2D convolution | 1e-5 |
+| `test_maxpool2d` | max pooling | bit-exact |
+| `test_flatten` | reshape | bit-exact |
+| `test_relu` | ReLU | 1e-6 |
+| `test_sigmoid` | sigmoid | 1e-6 |
+| `test_softmax` | softmax, sums to 1 | 1e-6 (sum 1e-5) |
+| `test_end_to_end` | MLP, softmax output | 1e-5 |
+| `test_no_alloc_forward` | `malloc`/`calloc`/`realloc`/`free` wrapped at link time, forward pass must not call them | 0 allocations in forward |
+
+Float32 throughout, built with `-ffp-contract=off`.
 
 ## Build
 
@@ -52,6 +71,21 @@ const char*   cinf_strerror   (cinf_status_t);
 `cinf_load_model` performs all allocations (weights, biases, activation
 slots) up front via a bump arena. `cinf_forward` performs zero
 allocations and is safe to call repeatedly with the same loaded model.
+
+## Targeting bare-metal / MCU
+
+The engine has no OS dependencies in the inference path. `cinf_forward`
+does no allocation and no I/O; it walks a static array of
+ops over buffers sized at load time.
+
+Current status, stated plainly:
+
+- `cinf_load_model` uses libc allocation (a temporary layer table and
+  the arena). On a target without a heap, replace them with a static buffer.
+- Weights are copied into the arena. Executing them in place from flash is
+  not implemented.
+- Only float32 is supported. No quantization yet.
+- Tested on desktop Linux only. An MCU port is not done.
 
 ## Architecture
 
